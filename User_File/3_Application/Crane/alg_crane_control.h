@@ -17,12 +17,19 @@
  * @note 以下参数是保守的软件限幅，联机前应按真实机械行程、减速比和负载重新标定。
  *       上位机协议中的角度统一使用 0.01 degree（厘度），电机驱动内部仍使用 rad。
  */
-static constexpr int32_t CRANE_EXTENSION_MIN_CDEG = -360000;   // -3600 deg
-static constexpr int32_t CRANE_EXTENSION_MAX_CDEG = 360000;    //  3600 deg
+static constexpr int32_t CRANE_EXTENSION_MIN_CDEG = -3600000;  // -36000 deg
+static constexpr int32_t CRANE_EXTENSION_MAX_CDEG = 3600000;   //  36000 deg
 static constexpr int32_t CRANE_WINCH_MIN_CDEG = -3600000;      // -36000 deg
 static constexpr int32_t CRANE_WINCH_MAX_CDEG = 3600000;       //  36000 deg
 static constexpr int32_t CRANE_YAW_MIN_CDEG = -70000;          // -700 deg
 static constexpr int32_t CRANE_YAW_MAX_CDEG = 70000;           //  700 deg
+
+// Speed commands use 0.01 rad/s. RS motors support up to 50 rad/s; the DM
+// motor instance is initialized with an Omega_Max of 25 rad/s.
+static constexpr int32_t CRANE_RS_SPEED_MIN_CRADPS = 10;        // 0.10 rad/s
+static constexpr int32_t CRANE_RS_SPEED_MAX_CRADPS = 5000;      // 50.00 rad/s
+static constexpr int32_t CRANE_YAW_SPEED_MIN_CRADPS = 10;       // 0.10 rad/s
+static constexpr int32_t CRANE_YAW_SPEED_MAX_CRADPS = 2500;     // 25.00 rad/s
 
 enum Enum_Crane_Pitch_Direction : int8_t
 {
@@ -77,6 +84,11 @@ private:
     uint32_t Last_Valid_Command_ms = 0;
     uint32_t Last_Pitch_Command_ms = 0;
     uint32_t Last_Telemetry_ms = 0;
+
+    int32_t Extension_Min_Cdeg = CRANE_EXTENSION_MIN_CDEG;
+    int32_t Extension_Max_Cdeg = CRANE_EXTENSION_MAX_CDEG;
+    int32_t Yaw_Min_Cdeg = CRANE_YAW_MIN_CDEG;
+    int32_t Yaw_Max_Cdeg = CRANE_YAW_MAX_CDEG;
 
     volatile bool Extension_Feedback_Received = false;
     volatile bool Winch_Feedback_Received = false;

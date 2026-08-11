@@ -150,6 +150,13 @@
     .mini-row { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
     .mini-row button { padding: .48rem .7rem; font-size: .75rem; color: var(--muted); }
     .limit { color: var(--muted); font-size: .7rem; font-variant-numeric: tabular-nums; }
+    .speed-control { margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--line); }
+    .limit-control { margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--line); }
+    .limit-inputs { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 8px; }
+    .limit-inputs label { margin: 0; }
+    .limit-settings-card { grid-column: span 8; }
+    .limit-settings-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; padding: 18px; }
+    .limit-settings-grid .limit-control { margin: 0; padding: 14px; border: 1px solid var(--line); border-radius: 12px; }
 
     fieldset { display: contents; }
     fieldset:disabled .card { filter: saturate(.62); }
@@ -178,6 +185,7 @@
       .card { grid-column: span 6; }
       .pitch-card { grid-column: 1 / -1; }
       .diag-card { grid-column: 1 / -1; }
+      .limit-settings-card { grid-column: 1 / -1; }
     }
 
     @media (max-width: 660px) {
@@ -189,6 +197,7 @@
       .card { grid-column: 1 / -1; }
       .pitch-layout { grid-template-columns: 1fr; }
       .pitch-state { border-right: 0; border-bottom: 1px solid var(--line); }
+      .limit-settings-grid { grid-template-columns: 1fr; }
     }
   </style>
 </head>
@@ -239,9 +248,10 @@
           </div>
           <div class="control">
             <label for="extTarget">目标角度（degree）</label>
-            <div class="target-row"><input id="extTarget" type="number" min="-3600" max="3600" step="0.01" value="0"><button data-apply="EXT" type="button">执行</button></div>
-            <input id="extRange" type="range" min="-3600" max="3600" step="0.1" value="0">
-            <div class="mini-row"><span class="limit">−3600° … +3600°</span><button data-current="EXT" type="button">取当前值</button></div>
+            <div class="target-row"><input id="extTarget" type="number" min="-36000" max="36000" step="0.01" value="0"><button data-apply="EXT" type="button">执行</button></div>
+            <input id="extRange" type="range" min="-36000" max="36000" step="1" value="0">
+            <div class="mini-row"><span class="limit">−36000° … +36000°</span><button data-current="EXT" type="button">取当前值</button></div>
+            <div class="speed-control"><label for="extSpeed">最大速度（rad/s）</label><div class="target-row"><input id="extSpeed" type="number" min="0.1" max="50" step="0.01" value="2"><button data-speed="EXT" type="button">设置速度</button></div></div>
           </div>
         </article>
 
@@ -259,6 +269,7 @@
             <div class="target-row"><input id="winchTarget" type="number" min="-36000" max="36000" step="0.01" value="0"><button data-apply="WINCH" type="button">执行</button></div>
             <input id="winchRange" type="range" min="-36000" max="36000" step="1" value="0">
             <div class="mini-row"><span class="limit">−36000° … +36000°</span><button data-current="WINCH" type="button">取当前值</button></div>
+            <div class="speed-control"><label for="winchSpeed">最大速度（rad/s）</label><div class="target-row"><input id="winchSpeed" type="number" min="0.1" max="50" step="0.01" value="3"><button data-speed="WINCH" type="button">设置速度</button></div></div>
           </div>
         </article>
 
@@ -276,6 +287,7 @@
             <div class="target-row"><input id="yawTarget" type="number" min="-700" max="700" step="0.01" value="0"><button data-apply="YAW" type="button">执行</button></div>
             <input id="yawRange" type="range" min="-700" max="700" step="0.1" value="0">
             <div class="mini-row"><span class="limit">−700° … +700°</span><button data-current="YAW" type="button">取当前值</button></div>
+            <div class="speed-control"><label for="yawSpeed">最大速度（rad/s）</label><div class="target-row"><input id="yawSpeed" type="number" min="0.1" max="25" step="0.01" value="1.5"><button data-speed="YAW" type="button">设置速度</button></div></div>
           </div>
         </article>
 
@@ -300,6 +312,27 @@
 
       </fieldset>
 
+      <fieldset id="configurationControls" disabled>
+        <article class="card limit-settings-card">
+          <div class="card-head">
+            <div><p class="eyebrow">Software travel limits</p><h2>软件限位设置</h2></div>
+            <span class="badge">连接后可设置</span>
+          </div>
+          <div class="limit-settings-grid">
+            <div class="limit-control">
+              <p class="eyebrow">伸缩机构</p>
+              <div class="limit-inputs"><label for="extLimitMin">最小限位 / °<input id="extLimitMin" type="number" min="-36000" max="36000" step="0.01" value="-36000"></label><label for="extLimitMax">最大限位 / °<input id="extLimitMax" type="number" min="-36000" max="36000" step="0.01" value="36000"></label></div>
+              <button data-limit="EXT" type="button">应用伸缩限位</button>
+            </div>
+            <div class="limit-control">
+              <p class="eyebrow">YAW 轴</p>
+              <div class="limit-inputs"><label for="yawLimitMin">最小限位 / °<input id="yawLimitMin" type="number" min="-700" max="700" step="0.01" value="-700"></label><label for="yawLimitMax">最大限位 / °<input id="yawLimitMax" type="number" min="-700" max="700" step="0.01" value="700"></label></div>
+              <button data-limit="YAW" type="button">应用 YAW 限位</button>
+            </div>
+          </div>
+        </article>
+      </fieldset>
+
       <article class="card diag-card">
         <div class="card-head"><div><p class="eyebrow">Diagnostics</p><h2>通信诊断</h2></div></div>
         <dl class="diag">
@@ -321,16 +354,16 @@
     const $ = (id) => document.getElementById(id);
     const ui = {
       connect: $('connectButton'), estop: $('estopButton'), safety: $('safetyToggle'),
-      controls: $('motionControls'), connectionDot: $('connectionDot'), connectionText: $('connectionText'),
+      controls: $('motionControls'), configuration: $('configurationControls'), connectionDot: $('connectionDot'), connectionText: $('connectionText'),
       systemDot: $('systemDot'), systemText: $('systemText'), telemetryText: $('telemetryText'),
       safetyHint: $('safetyHint'), log: $('eventLog'), commandAge: $('commandAge'), overflow: $('overflowCount'),
       pitchState: $('pitchState'), pitchUp: $('pitchUp'), pitchDown: $('pitchDown')
     };
 
     const axes = {
-      EXT: { input: $('extTarget'), range: $('extRange'), output: $('extAngle'), badge: $('extBadge'), actual: 0 },
-      WINCH: { input: $('winchTarget'), range: $('winchRange'), output: $('winchAngle'), badge: $('winchBadge'), actual: 0 },
-      YAW: { input: $('yawTarget'), range: $('yawRange'), output: $('yawAngle'), badge: $('yawBadge'), actual: 0 }
+      EXT: { input: $('extTarget'), range: $('extRange'), speed: $('extSpeed'), limitMin: $('extLimitMin'), limitMax: $('extLimitMax'), output: $('extAngle'), badge: $('extBadge'), actual: 0 },
+      WINCH: { input: $('winchTarget'), range: $('winchRange'), speed: $('winchSpeed'), output: $('winchAngle'), badge: $('winchBadge'), actual: 0 },
+      YAW: { input: $('yawTarget'), range: $('yawRange'), speed: $('yawSpeed'), limitMin: $('yawLimitMin'), limitMax: $('yawLimitMax'), output: $('yawAngle'), badge: $('yawBadge'), actual: 0 }
     };
 
     let port = null;
@@ -368,6 +401,7 @@
       ui.connectionDot.className = `dot${connected ? ' ok' : ''}`;
       ui.connect.textContent = connected ? '断开串口' : '连接串口';
       ui.safety.disabled = !connected;
+      ui.configuration.disabled = !connected;
       if (!connected) {
         connectedAt = 0;
         lastTelemetryAt = 0;
@@ -525,6 +559,15 @@
       updateAxis('WINCH', values[1], p[6] === '1');
       updateAxis('YAW', values[2], p[8] === '1');
       updatePitch(values[3]);
+      if (p.length >= 16) {
+        updateSpeed('EXT', Number(p[13]));
+        updateSpeed('WINCH', Number(p[14]));
+        updateSpeed('YAW', Number(p[15]));
+      }
+      if (p.length >= 20) {
+        updateLimits('EXT', Number(p[16]), Number(p[17]));
+        updateLimits('YAW', Number(p[18]), Number(p[19]));
+      }
 
       ui.safety.checked = safetyDesired;
       ui.controls.disabled = !enabled;
@@ -554,6 +597,25 @@
       axis.actual = centidegree / 100;
       axis.output.textContent = axis.actual.toFixed(2);
       setOnline(axis.badge, online);
+    }
+
+    function updateSpeed(name, centiradianPerSecond) {
+      const axis = axes[name];
+      if (!Number.isFinite(centiradianPerSecond) || document.activeElement === axis.speed) return;
+      axis.speed.value = (centiradianPerSecond / 100).toFixed(2);
+    }
+
+    function updateLimits(name, minCentidegree, maxCentidegree) {
+      const axis = axes[name];
+      if (!axis.limitMin || !Number.isFinite(minCentidegree) || !Number.isFinite(maxCentidegree)) return;
+      const minDegree = minCentidegree / 100;
+      const maxDegree = maxCentidegree / 100;
+      axis.input.min = String(minDegree);
+      axis.input.max = String(maxDegree);
+      axis.range.min = String(minDegree);
+      axis.range.max = String(maxDegree);
+      if (document.activeElement !== axis.limitMin) axis.limitMin.value = minDegree.toFixed(2);
+      if (document.activeElement !== axis.limitMax) axis.limitMax.value = maxDegree.toFixed(2);
     }
 
     function updatePitch(direction) {
@@ -591,6 +653,36 @@
       axis.range.value = String(value);
       writeLine(`SET,${name},${Math.round(value * 100)}`);
       log(`${name} 目标设为 ${value.toFixed(2)}°`);
+    }
+
+    function applySpeed(name) {
+      const input = axes[name].speed;
+      let value = Number(input.value);
+      if (!Number.isFinite(value)) return;
+      value = Math.min(Number(input.max), Math.max(Number(input.min), value));
+      input.value = value.toFixed(2);
+      writeLine(`SPEED,${name},${Math.round(value * 100)}`);
+      log(`${name} 最大速度设为 ${value.toFixed(2)} rad/s`);
+    }
+
+    function applyLimit(name) {
+      const axis = axes[name];
+      let minValue = Number(axis.limitMin.value);
+      let maxValue = Number(axis.limitMax.value);
+      if (!Number.isFinite(minValue) || !Number.isFinite(maxValue) || minValue >= maxValue) {
+        log(`${name} 限位无效：最小值必须小于最大值。`);
+        return;
+      }
+      minValue = Math.max(Number(axis.limitMin.min), Math.min(Number(axis.limitMin.max), minValue));
+      maxValue = Math.max(Number(axis.limitMax.min), Math.min(Number(axis.limitMax.max), maxValue));
+      if (minValue >= maxValue) {
+        log(`${name} 限位超出固件硬范围。`);
+        return;
+      }
+      axis.limitMin.value = minValue.toFixed(2);
+      axis.limitMax.value = maxValue.toFixed(2);
+      writeLine(`LIMIT,${name},${Math.round(minValue * 100)},${Math.round(maxValue * 100)}`);
+      log(`${name} 限位设为 ${minValue.toFixed(2)}° … ${maxValue.toFixed(2)}°`);
     }
 
     function startPitchJog(command) {
@@ -641,11 +733,22 @@
         axis.range.value = String(axis.actual);
       });
     });
+    document.querySelectorAll('[data-speed]').forEach((button) => {
+      button.addEventListener('click', () => applySpeed(button.dataset.speed));
+    });
+    document.querySelectorAll('[data-limit]').forEach((button) => {
+      button.addEventListener('click', () => applyLimit(button.dataset.limit));
+    });
 
     for (const [name, axis] of Object.entries(axes)) {
       axis.range.addEventListener('input', () => { axis.input.value = axis.range.value; });
       axis.input.addEventListener('input', () => { axis.range.value = axis.input.value; });
       axis.input.addEventListener('keydown', (event) => { if (event.key === 'Enter') applyAxis(name); });
+      axis.speed.addEventListener('keydown', (event) => { if (event.key === 'Enter') applySpeed(name); });
+      if (axis.limitMin) {
+        axis.limitMin.addEventListener('keydown', (event) => { if (event.key === 'Enter') applyLimit(name); });
+        axis.limitMax.addEventListener('keydown', (event) => { if (event.key === 'Enter') applyLimit(name); });
+      }
     }
 
     const bindJog = (button, command) => {

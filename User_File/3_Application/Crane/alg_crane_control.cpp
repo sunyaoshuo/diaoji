@@ -8,12 +8,19 @@
  *   SET,EXT,<centidegree>\n
  *   SET,WINCH,<centidegree>\n
  *   SET,YAW,<centidegree>\n
+ *   SPEED,EXT,<centiradian_per_second>\n
+ *   SPEED,WINCH,<centiradian_per_second>\n
+ *   SPEED,YAW,<centiradian_per_second>\n
+ *   LIMIT,EXT,<min_centidegree>,<max_centidegree>\n
+ *   LIMIT,YAW,<min_centidegree>,<max_centidegree>\n
  *   PITCH,UP|DOWN|STOP\n
  *
  * 遥测：
  *   TEL,<safe_requested>,<outputs_enabled>,<ext_cdeg>,<ext_online>,
  *       <winch_cdeg>,<winch_online>,<yaw_cdeg>,<yaw_online>,
- *       <pitch_direction>,<command_age_ms>,<rx_overflow_count>,<tx_error_count>\n
+ *       <pitch_direction>,<command_age_ms>,<rx_overflow_count>,<tx_error_count>,
+ *       <ext_speed_cradps>,<winch_speed_cradps>,<yaw_speed_cradps>,
+ *       <ext_min_cdeg>,<ext_max_cdeg>,<yaw_min_cdeg>,<yaw_max_cdeg>\n
  */
 
 #include "alg_crane_control.h"
@@ -29,11 +36,11 @@
 namespace
 {
 constexpr float CRANE_PI = 3.14159265358979323846f;
-constexpr float EXTENSION_SPEED_LIMIT_RADPS = 2.0f;
-constexpr float WINCH_SPEED_LIMIT_RADPS = 3.0f;
+constexpr float EXTENSION_DEFAULT_SPEED_RADPS = 2.0f;
+constexpr float WINCH_DEFAULT_SPEED_RADPS = 3.0f;
 constexpr float RS_ACCELERATION_RADPS2 = 8.0f;
 constexpr float RS_CURRENT_LIMIT_A = 5.0f;
-constexpr float YAW_SPEED_LIMIT_RADPS = 1.5f;
+constexpr float YAW_DEFAULT_SPEED_RADPS = 1.5f;
 
 void Crane_CAN2_Callback(FDCAN_RxHeaderTypeDef &Header, uint8_t *Buffer)
 {
@@ -59,14 +66,14 @@ void Class_Crane_Control::Init()
     // 两台 RobStride 电机均挂载 CAN2，ID 1/2，PP 位置模式。
     Extension_Motor.Init(&hfdcan2, 1, RS_MASTER_ID);
     Extension_Motor.Set_Control_Method(Motor_RS_Control_Method_POSITION_PP);
-    Extension_Motor.Set_Control_Speed_Limit(EXTENSION_SPEED_LIMIT_RADPS);
+    Extension_Motor.Set_Control_Speed_Limit(EXTENSION_DEFAULT_SPEED_RADPS);
     Extension_Motor.Set_Control_Acceleration(RS_ACCELERATION_RADPS2);
     Extension_Motor.Set_Control_Deceleration(RS_ACCELERATION_RADPS2);
     Extension_Motor.Set_Control_Current_Limit(RS_CURRENT_LIMIT_A);
 
     Winch_Motor.Init(&hfdcan2, 2, RS_MASTER_ID);
     Winch_Motor.Set_Control_Method(Motor_RS_Control_Method_POSITION_PP);
-    Winch_Motor.Set_Control_Speed_Limit(WINCH_SPEED_LIMIT_RADPS);
+    Winch_Motor.Set_Control_Speed_Limit(WINCH_DEFAULT_SPEED_RADPS);
     Winch_Motor.Set_Control_Acceleration(RS_ACCELERATION_RADPS2);
     Winch_Motor.Set_Control_Deceleration(RS_ACCELERATION_RADPS2);
     Winch_Motor.Set_Control_Current_Limit(RS_CURRENT_LIMIT_A);
@@ -77,7 +84,7 @@ void Class_Crane_Control::Init()
                    0x00,
                    0x01,
                    Motor_DM_Control_Method_NORMAL_ANGLE_OMEGA);
-    Yaw_Motor.Set_Control_Omega(YAW_SPEED_LIMIT_RADPS);
+    Yaw_Motor.Set_Control_Omega(YAW_DEFAULT_SPEED_RADPS);
 
     CAN_Init(&hfdcan2, Crane_CAN2_Callback);
     // USART1 使用硬件循环 DMA，由主循环按 DMA 写指针取数。避免共享 UART 驱动的
@@ -324,7 +331,19 @@ void Class_Crane_Control::Parse_Command(char *Line)
                 break;
             }
 
-            const int32_t Target = Clamp_Centidegree(static_cast<int32_t>(Parsed), Command.Min, Command.Max);
+            int32_t Active_Min = Command.Min;
+            int32_t Active_Max = Command.Max;
+            if (Command.Axis == 0u)
+            {
+                Active_Min = Extension_Min_Cdeg;
+                Active_Max = Extension_Max_Cdeg;
+            }
+            else if (Command.Axis == 2u)
+            {
+                Active_Min = Yaw_Min_Cdeg;
+                Active_Max = Yaw_Max_Cdeg;
+            }
+            const int32_t Target = Clamp_Centidegree(static_cast<int32_t>(Parsed), Active_Min, Active_Max);
             if (Outputs_Enabled)
             {
                 if (Command.Axis == 0)
@@ -342,6 +361,110 @@ void Class_Crane_Control::Parse_Command(char *Line)
             }
             Valid = true;
             break;
+        }
+
+        struct Speed_Command
+        {
+            const char *Prefix;
+            int32_t Min;
+            int32_t Max;
+            uint8_t Axis;
+        };
+
+        static constexpr Speed_Command Speed_Commands[] = {
+            {"SPEED,EXT,", CRANE_RS_SPEED_MIN_CRADPS, CRANE_RS_SPEED_MAX_CRADPS, 0},
+            {"SPEED,WINCH,", CRANE_RS_SPEED_MIN_CRADPS, CRANE_RS_SPEED_MAX_CRADPS, 1},
+            {"SPEED,YAW,", CRANE_YAW_SPEED_MIN_CRADPS, CRANE_YAW_SPEED_MAX_CRADPS, 2},
+        };
+
+        if (!Valid)
+        {
+            for (const Speed_Command &Command : Speed_Commands)
+            {
+                const size_t Prefix_Length = std::strlen(Command.Prefix);
+                if (std::strncmp(Line, Command.Prefix, Prefix_Length) != 0)
+                {
+                    continue;
+                }
+
+                char *End = nullptr;
+                const long Parsed = std::strtol(Line + Prefix_Length, &End, 10);
+                if ((End != (Line + Prefix_Length)) && (*End == '\0') &&
+                    (Parsed >= Command.Min) && (Parsed <= Command.Max))
+                {
+                    const float Speed_radps = static_cast<float>(Parsed) / 100.0f;
+                    if (Command.Axis == 0u)
+                    {
+                        Extension_Motor.Set_Control_Speed_Limit(Speed_radps);
+                        if (Outputs_Enabled) Extension_Motor.CAN_Send_Set_PP_Max_Speed(Speed_radps);
+                    }
+                    else if (Command.Axis == 1u)
+                    {
+                        Winch_Motor.Set_Control_Speed_Limit(Speed_radps);
+                        if (Outputs_Enabled) Winch_Motor.CAN_Send_Set_PP_Max_Speed(Speed_radps);
+                    }
+                    else
+                    {
+                        Yaw_Motor.Set_Control_Omega(Speed_radps);
+                    }
+                    Valid = true;
+                }
+                break;
+            }
+        }
+
+        struct Limit_Command
+        {
+            const char *Prefix;
+            int32_t Hard_Min;
+            int32_t Hard_Max;
+            uint8_t Axis;
+        };
+
+        static constexpr Limit_Command Limit_Commands[] = {
+            {"LIMIT,EXT,", CRANE_EXTENSION_MIN_CDEG, CRANE_EXTENSION_MAX_CDEG, 0},
+            {"LIMIT,YAW,", CRANE_YAW_MIN_CDEG, CRANE_YAW_MAX_CDEG, 2},
+        };
+
+        if (!Valid)
+        {
+            for (const Limit_Command &Command : Limit_Commands)
+            {
+                const size_t Prefix_Length = std::strlen(Command.Prefix);
+                if (std::strncmp(Line, Command.Prefix, Prefix_Length) != 0)
+                {
+                    continue;
+                }
+
+                char *Separator = nullptr;
+                const char *Min_Text = Line + Prefix_Length;
+                const long Parsed_Min = std::strtol(Min_Text, &Separator, 10);
+                if ((Separator != Min_Text) && (*Separator == ','))
+                {
+                    char *End = nullptr;
+                    const char *Max_Text = Separator + 1;
+                    const long Parsed_Max = std::strtol(Max_Text, &End, 10);
+                    if ((End != Max_Text) && (*End == '\0') &&
+                        (Parsed_Min >= Command.Hard_Min) &&
+                        (Parsed_Max <= Command.Hard_Max) &&
+                        (Parsed_Min < Parsed_Max))
+                    {
+                        if (Command.Axis == 0u)
+                        {
+                            Extension_Min_Cdeg = static_cast<int32_t>(Parsed_Min);
+                            Extension_Max_Cdeg = static_cast<int32_t>(Parsed_Max);
+                        }
+                        else
+                        {
+                            Yaw_Min_Cdeg = static_cast<int32_t>(Parsed_Min);
+                            Yaw_Max_Cdeg = static_cast<int32_t>(Parsed_Max);
+                        }
+                        Valid = true;
+                        Telemetry_Requested = true;
+                    }
+                }
+                break;
+            }
         }
 
         if (std::strcmp(Line, "PITCH,UP") == 0)
@@ -393,7 +516,6 @@ void Class_Crane_Control::Request_Safety(bool Enable, uint32_t Now_ms)
     Extension_Motor.Set_Control_Angle(Extension_Motor.Get_Total_Angle());
     Winch_Motor.Set_Control_Angle(Winch_Motor.Get_Total_Angle());
     Yaw_Motor.Set_Control_Angle(Yaw_Motor.Get_Now_Angle());
-    Yaw_Motor.Set_Control_Omega(YAW_SPEED_LIMIT_RADPS);
 
     Safety_Requested = true;
     Outputs_Enabled = false;
@@ -517,7 +639,7 @@ void Class_Crane_Control::Send_Telemetry(uint32_t Now_ms)
     const int Length = std::snprintf(
         Tx_Buffer,
         sizeof(Tx_Buffer),
-        "TEL,%u,%u,%ld,%u,%ld,%u,%ld,%u,%d,%lu,%lu,%lu\n",
+        "TEL,%u,%u,%ld,%u,%ld,%u,%ld,%u,%d,%lu,%lu,%lu,%ld,%ld,%ld,%ld,%ld,%ld,%ld\n",
         Safety_Requested ? 1u : 0u,
         Outputs_Enabled ? 1u : 0u,
         static_cast<long>(Radian_To_Centidegree(Extension_Motor.Get_Total_Angle())),
@@ -529,7 +651,14 @@ void Class_Crane_Control::Send_Telemetry(uint32_t Now_ms)
         static_cast<int>(Pitch_Direction),
         static_cast<unsigned long>(Command_Age_ms),
         static_cast<unsigned long>(UART_Ring_Overflow_Count),
-        static_cast<unsigned long>(UART_Tx_Error_Count));
+        static_cast<unsigned long>(UART_Tx_Error_Count),
+        static_cast<long>(Extension_Motor.Get_Control_Speed_Limit() * 100.0f + 0.5f),
+        static_cast<long>(Winch_Motor.Get_Control_Speed_Limit() * 100.0f + 0.5f),
+        static_cast<long>(Yaw_Motor.Get_Control_Omega() * 100.0f + 0.5f),
+        static_cast<long>(Extension_Min_Cdeg),
+        static_cast<long>(Extension_Max_Cdeg),
+        static_cast<long>(Yaw_Min_Cdeg),
+        static_cast<long>(Yaw_Max_Cdeg));
 
     if ((Length > 0) && (Length < static_cast<int>(sizeof(Tx_Buffer))))
     {

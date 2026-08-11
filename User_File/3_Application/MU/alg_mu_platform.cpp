@@ -15,7 +15,7 @@ constexpr float DEG_TO_RAD = MU_PI / 180.0f;
 constexpr float MIN_LENGTH_SQ_MM = 7403.5f;
 constexpr float MAX_LENGTH_SQ_MM = 14613.183225f;
 constexpr float MOTOR_ZERO_OFFSET_RAD = 0.5f;
-constexpr float MOTOR_SPEED_LIMIT_RADPS = 3.0f;
+constexpr float MOTOR_SPEED_LIMIT_RADPS = 25.0f;
 
 void MU_CAN1_Callback(FDCAN_RxHeaderTypeDef &Header, uint8_t *Buffer)
 {
