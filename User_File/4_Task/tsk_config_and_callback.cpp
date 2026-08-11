@@ -116,7 +116,7 @@ void Task_Init()
     HAL_TIM_Base_Start_IT(&htim8);
 
     // MUsss platform: BMI088, CAN1 motors and 3-RSS inverse kinematics.
-    // Initialization is output-safe: no motor enable and no flash zero write.
+    // 平衡台使能 CAN1 电机，并将每次上电位置写入电机 Flash 作为零点。
     MU_Platform.Init();
 
     // 吊机 CAN2 电机、PE13/PE9 直线电机与 USART1 上位机初始化。

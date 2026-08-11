@@ -45,8 +45,8 @@ void Class_MU_Platform::Init()
     SPI_Init(&hspi2, MU_SPI2_Callback);
     BSP_BMI088.Init();
 
-    // Keep the original MUsss startup sequence: enter motor mode, save the
-    // current mechanical position as zero, then immediately start control.
+    // Enter motor mode, save the current mechanical position as zero, then
+    // start platform control. This writes each motor's Flash on power-up.
     Motor_1.CAN_Send_Enter();
     Motor_2.CAN_Send_Enter();
     Motor_3.CAN_Send_Enter();
