@@ -1,0 +1,14 @@
+--- a/drv_can.cpp
++++ b/drv_can.cpp
+@@ -86,8 +86,9 @@
+     can_filter_init_structure.FilterID2 = 0x00000000;
+     HAL_FDCAN_ConfigFilter(hfdcan, &can_filter_init_structure);
+ 
+-    // 全局滤波器, 直接拒绝不符合规则的标准数据帧, 扩展数据帧, 标准遥控帧, 扩展遥控帧
+-    HAL_FDCAN_ConfigGlobalFilter(hfdcan, FDCAN_REJECT, FDCAN_REJECT, FDCAN_FILTER_REMOTE, FDCAN_FILTER_REMOTE);
++    // 全局滤波器：标准帧仍由上方全通滤波器接收；未匹配扩展数据帧进入 FIFO0，
++    // 供 RobStride 私有 29 位扩展帧协议使用。遥控帧仍然拒绝。
++    HAL_FDCAN_ConfigGlobalFilter(hfdcan, FDCAN_REJECT, FDCAN_ACCEPT_IN_RX_FIFO0, FDCAN_FILTER_REMOTE, FDCAN_FILTER_REMOTE);
+ 
+     // 启动CAN中断与总线
+     HAL_FDCAN_ActivateNotification(hfdcan, FDCAN_IT_RX_FIFO0_NEW_MESSAGE | FDCAN_IT_BUS_OFF | FDCAN_IT_ERROR_PASSIVE | FDCAN_IT_ARB_PROTOCOL_ERROR | FDCAN_IT_DATA_PROTOCOL_ERROR, 0);
